@@ -11,7 +11,7 @@ CareerForge AI is an AI-powered career, placement, and interview intelligence pl
 
 ## Current development phase
 
-**Phase 0 — Foundation.** The repository currently contains a minimal React/Vite frontend and FastAPI backend health endpoint. No authentication, database, or AI functionality has been implemented.
+**Phase 2 — User model and registration.** The backend now includes a PostgreSQL-backed user model, password hashing, Alembic migrations, and the `POST /api/v1/auth/register` endpoint. Login, JWTs, and frontend authentication are intentionally not implemented yet.
 
 ## Local development
 
@@ -34,6 +34,33 @@ python -m uvicorn app.main:app --reload
 ```
 
 The API runs at `http://127.0.0.1:8000`. Visit `http://127.0.0.1:8000/` for its status response and `http://127.0.0.1:8000/docs` for Swagger UI.
+
+### Registration endpoint
+
+```http
+POST /api/v1/auth/register
+```
+
+Request body:
+
+```json
+{
+  "email": "student@example.com",
+  "password": "StrongPass123!",
+  "full_name": "Student Name"
+}
+```
+
+The backend normalizes the email, validates the password strength, hashes the password with bcrypt, persists the user record to PostgreSQL, and returns a safe user payload without exposing `password` or `password_hash`.
+
+### Database migrations
+
+```powershell
+cd D:\careerforge-ai\backend
+.\.venv\Scripts\python.exe -m alembic upgrade head
+```
+
+Alembic is used for schema management so the application table definitions remain reproducible and do not rely on `Base.metadata.create_all()`.
 
 ## Project structure
 
