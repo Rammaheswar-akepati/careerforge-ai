@@ -11,7 +11,7 @@ CareerForge AI is an AI-powered career, placement, and interview intelligence pl
 
 ## Current development phase
 
-**Phase 2 — User model and registration.** The backend now includes a PostgreSQL-backed user model, password hashing, Alembic migrations, and the `POST /api/v1/auth/register` endpoint. Login, JWTs, and frontend authentication are intentionally not implemented yet.
+**Phase 3 — Login and JWT authentication.** The backend now includes secure user login, JWT-based access tokens, and a protected authenticated-user endpoint. Frontend authentication and refresh tokens remain intentionally out of scope.
 
 ## Local development
 
@@ -52,6 +52,29 @@ Request body:
 ```
 
 The backend normalizes the email, validates the password strength, hashes the password with bcrypt, persists the user record to PostgreSQL, and returns a safe user payload without exposing `password` or `password_hash`.
+
+### Login and JWT authentication
+
+```http
+POST /api/v1/auth/login
+```
+
+Request body:
+
+```json
+{
+  "email": "student@example.com",
+  "password": "StrongPass123!"
+}
+```
+
+The login endpoint validates credentials, verifies the stored bcrypt hash, and returns a JWT access token. Use the token in the `Authorization: Bearer <token>` header for protected endpoints such as:
+
+```http
+GET /api/v1/auth/me
+```
+
+The application requires a secure `JWT_SECRET` environment variable defined in the local backend `.env` file.
 
 ### Database migrations
 

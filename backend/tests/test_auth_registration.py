@@ -149,3 +149,180 @@ def test_user_is_persisted_in_database(client: TestClient) -> None:
     session.close()
 
     assert count == 1
+
+
+def test_login_success(client: TestClient) -> None:
+    client.post(
+        "/api/v1/auth/register",
+        json={
+            "email": "login@example.com",
+            "password": "StrongPass123!",
+            "full_name": "Login User",
+        },
+    )
+
+    response = client.post(
+        "/api/v1/auth/login",
+        json={
+            "email": "login@example.com",
+            "password": "StrongPass123!",
+        },
+    )
+
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    assert payload["token_type"] == "bearer"
+    assert "access_token" in payload
+    assert "password_hash" not in payload
+    assert "password" not in payload
+
+
+def test_login_wrong_password(client: TestClient) -> None:
+    client.post(
+        "/api/v1/auth/register",
+        json={
+            "email": "wrongpass@example.com",
+            "password": "StrongPass123!",
+            "full_name": "Wrong Pass User",
+        },
+    )
+
+    response = client.post(
+        "/api/v1/auth/login",
+        json={
+            "email": "wrongpass@example.com",
+            "password": "WrongPass456!",
+        },
+    )
+
+    assert response.status_code == 401, response.text
+
+
+def test_login_nonexistent_email(client: TestClient) -> None:
+    response = client.post(
+        "/api/v1/auth/login",
+        json={
+            "email": "missing@example.com",
+            "password": "StrongPass123!",
+        },
+    )
+
+    assert response.status_code == 401, response.text
+
+
+def test_login_invalid_email_format(client: TestClient) -> None:
+    response = client.post(
+        "/api/v1/auth/login",
+        json={
+            "email": "not-an-email",
+            "password": "StrongPass123!",
+        },
+    )
+
+    assert response.status_code == 422, response.text
+
+
+def test_login_inactive_user(client: TestClient) -> None:
+    session = get_session_factory()()
+    session.add(
+        User(
+            email="inactive@example.com",
+            password_hash="$2b$12$dummyhashvalueforinactiveuser",
+            full_name="Inactive User",
+            is_active=False,
+        )
+    )
+    session.commit()
+    session.close()
+
+    response = client.post(
+        "/api/v1/auth/login",
+        json={
+            "email": "inactive@example.com",
+            "password": "StrongPass123!",
+        },
+    )
+
+    assert response.status_code == 401, response.text
+
+
+def test_get_me_with_valid_token(client: TestClient) -> None:
+    register_response = client.post(
+        "/api/v1/auth/register",
+        json={
+            "email": "me@example.com",
+            "password": "StrongPass123!",
+            "full_name": "Me User",
+        },
+    )
+    assert register_response.status_code == 201, register_response.text
+
+    login_response = client.post(
+        "/api/v1/auth/login",
+        json={
+            "email": "me@example.com",
+            "password": "StrongPass123!",
+        },
+    )
+    token = login_response.json()["access_token"]
+
+    response = client.get(
+        "/api/v1/auth/me",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    assert payload["email"] == "me@example.com"
+    assert "password_hash" not in payload
+    assert "password" not in payload
+
+
+def test_get_me_requires_token(client: TestClient) -> None:
+    response = client.get("/api/v1/auth/me")
+
+    assert response.status_code == 401, response.text
+
+
+def test_get_me_rejects_malformed_token(client: TestClient) -> None:
+    response = client.get(
+        "/api/v1/auth/me",
+        headers={"Authorization": "Token abcdef"},
+    )
+
+    assert response.status_code == 401, response.text
+
+
+def test_get_me_rejects_invalid_token(client: TestClient) -> None:
+    response = client.get(
+        "/api/v1/auth/me",
+        headers={"Authorization": "Bearer invalid-token"},
+    )
+
+    assert response.status_code == 401, response.text
+
+
+def test_jwt_expired_token_rejected(client: TestClient) -> None:
+    from datetime import timedelta
+
+    from app.core.security import create_access_token
+
+    token = create_access_token(
+        subject=999999,
+        expires_delta=timedelta(minutes=-5),
+    )
+
+    response = client.get(
+        "/api/v1/auth/me",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert response.status_code == 401, response.text
+
+
+def test_jwt_payload_has_no_password_fields(client: TestClient) -> None:
+    from app.core.security import create_access_token
+
+    token = create_access_token(subject=123)
+    payload = token.split(".")[1]
+    assert payload

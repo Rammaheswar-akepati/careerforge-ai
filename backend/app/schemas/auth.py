@@ -34,3 +34,26 @@ class UserCreate(BaseModel):
         return cleaned_name
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class LoginRequest(BaseModel):
+    """Fields required to log in an existing user."""
+
+    email: EmailStr
+    password: str = Field(..., min_length=8, max_length=128)
+
+    @field_validator("email")
+    @classmethod
+    def normalize_email(cls, value: EmailStr) -> str:
+        return value.strip().lower()
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class Token(BaseModel):
+    """JWT response payload returned after login."""
+
+    access_token: str
+    token_type: str = "bearer"
+
+    model_config = ConfigDict(from_attributes=True)

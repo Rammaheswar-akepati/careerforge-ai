@@ -16,6 +16,9 @@ class UserRepository:
         statement = select(User).where(User.email == email)
         return self.session.execute(statement).scalar_one_or_none()
 
+    def get_by_id(self, user_id: int) -> User | None:
+        return self.session.get(User, user_id)
+
     def create(self, user: User) -> User:
         self.session.add(user)
         self.session.commit()
