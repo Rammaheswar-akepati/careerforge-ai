@@ -1,6 +1,6 @@
 # CareerForge AI
 
-CareerForge AI is an AI-powered career, placement, and interview intelligence platform for students. It will help students manage career information, prepare for roles, and make informed job-application decisions. AI, database, and authentication capabilities will be introduced progressively in later phases.
+CareerForge AI is an AI-powered career, placement, and interview intelligence platform for students. It helps students manage career information and prepare for roles. AI capabilities will be introduced progressively in later phases.
 
 ## Technology stack
 
@@ -11,7 +11,7 @@ CareerForge AI is an AI-powered career, placement, and interview intelligence pl
 
 ## Current development phase
 
-**Phase 3 — Login and JWT authentication.** The backend now includes secure user login, JWT-based access tokens, and a protected authenticated-user endpoint. Frontend authentication and refresh tokens remain intentionally out of scope.
+**Phase 4 — Student Profile and Skills.** The backend includes Phase 3 registration and JWT authentication, plus authenticated student-profile CRUD and reusable profile skills. Profiles and skills are persisted through SQLAlchemy and Alembic. Frontend profile UI and later AI capabilities remain out of scope.
 
 ## Local development
 
@@ -84,6 +84,15 @@ cd D:\careerforge-ai\backend
 ```
 
 Alembic is used for schema management so the application table definitions remain reproducible and do not rely on `Base.metadata.create_all()`.
+
+### Backend tests
+
+```powershell
+cd D:\careerforge-ai\backend
+.\.venv\Scripts\python.exe -m pytest
+```
+
+The test bootstrap overrides `DATABASE_URL` with a uniquely created temporary SQLite database under `backend/`, applies the Alembic migrations, verifies the active engine points to that database, and removes the temporary database after the test session. Tests do not connect to the application's configured database.
 
 ## Project structure
 

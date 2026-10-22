@@ -8,7 +8,7 @@ from dotenv import load_dotenv
 from sqlalchemy import engine_from_config, pool
 
 from app.db.base import Base
-from app.models.user import User  # noqa: F401
+from app.models import Skill, StudentProfile, StudentSkill, User  # noqa: F401
 
 load_dotenv(Path(__file__).resolve().parents[1] / ".env", override=False)
 

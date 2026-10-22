@@ -2,24 +2,10 @@ from __future__ import annotations
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import delete
 
 from app.main import app
 from app.db.session import get_session_factory
 from app.models.user import User
-
-
-@pytest.fixture(autouse=True)
-def clean_users() -> None:
-    session = get_session_factory()()
-    session.execute(delete(User))
-    session.commit()
-    session.close()
-    yield
-    session = get_session_factory()()
-    session.execute(delete(User))
-    session.commit()
-    session.close()
 
 
 @pytest.fixture()
