@@ -1,7 +1,14 @@
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from sqlalchemy.orm import Session
 
 from app.api.v1.auth import get_current_user
-from app.schemas.resume import ResumeTextRead
+from app.db.session import get_db
+from app.models.user import User
+from app.repositories.resume_repository import (
+    ResumePersistenceError,
+    ResumeRepository,
+)
+from app.schemas.resume import ResumeRead, ResumeTextRead
 from app.services.resume_service import (
     EmptyPdfError,
     EncryptedPdfError,
@@ -10,6 +17,7 @@ from app.services.resume_service import (
     NoExtractableTextError,
     PdfProcessingLimitError,
     ResumeTooLargeError,
+    ResumeService,
     TooManyPdfPagesError,
     extract_resume_text,
 )
@@ -19,6 +27,10 @@ router = APIRouter(
     tags=["resumes"],
     dependencies=[Depends(get_current_user)],
 )
+
+
+def get_resume_service(db: Session = Depends(get_db)) -> ResumeService:
+    return ResumeService(ResumeRepository(db))
 
 
 @router.post("/extract-text", response_model=ResumeTextRead)
@@ -72,3 +84,63 @@ async def extract_resume_pdf_text(
         await file.close()
 
     return ResumeTextRead(text=result.text, page_count=result.page_count)
+
+
+@router.post("", response_model=ResumeRead, status_code=status.HTTP_201_CREATED)
+async def upload_resume(
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_user),
+    service: ResumeService = Depends(get_resume_service),
+) -> ResumeRead:
+    """Extract and save resume text and metadata for the authenticated user."""
+    try:
+        resume = await service.create_resume(current_user.id, file)
+    except ResumeTooLargeError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_413_CONTENT_TOO_LARGE,
+            detail="PDF must not exceed 5 MB.",
+        ) from exc
+    except ExtractedTextTooLargeError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_413_CONTENT_TOO_LARGE,
+            detail="Extracted PDF text exceeds the supported size.",
+        ) from exc
+    except TooManyPdfPagesError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="PDF must not contain more than 100 pages.",
+        ) from exc
+    except PdfProcessingLimitError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="PDF exceeds supported processing limits.",
+        ) from exc
+    except EmptyPdfError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="PDF upload is empty.",
+        ) from exc
+    except EncryptedPdfError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="Encrypted PDFs are not supported.",
+        ) from exc
+    except NoExtractableTextError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="PDF contains no extractable text.",
+        ) from exc
+    except InvalidPdfError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="Upload is not a valid, readable PDF.",
+        ) from exc
+    except ResumePersistenceError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Unable to save resume.",
+        ) from exc
+    finally:
+        await file.close()
+
+    return resume

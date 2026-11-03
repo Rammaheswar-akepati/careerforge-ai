@@ -9,6 +9,8 @@ from fastapi import UploadFile
 from pypdf import PdfReader, apply_configuration
 from pypdf.errors import LimitReachedError, PyPdfError
 
+from app.models.resume import Resume
+from app.repositories.resume_repository import ResumeRepository
 
 MAX_UPLOAD_BYTES = 5 * 1024 * 1024
 MAX_PDF_PAGES = 100
@@ -58,6 +60,21 @@ class PdfProcessingLimitError(ResumeExtractionError):
 class ExtractedResumeText:
     text: str
     page_count: int
+
+
+class ResumeService:
+    """Extract and persist resumes for their authenticated owners."""
+
+    def __init__(self, repository: ResumeRepository) -> None:
+        self.repository = repository
+
+    async def create_resume(self, user_id: int, upload: UploadFile) -> Resume:
+        extracted = await extract_resume_text(upload)
+        return self.repository.create(
+            user_id=user_id,
+            extracted_text=extracted.text,
+            page_count=extracted.page_count,
+        )
 
 
 async def read_bounded_upload(upload: UploadFile) -> bytes:
