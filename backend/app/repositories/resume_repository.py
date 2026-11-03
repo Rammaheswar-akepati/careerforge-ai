@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from sqlalchemy import func, select
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
@@ -37,3 +38,27 @@ class ResumeRepository:
             self.session.rollback()
             raise ResumePersistenceError("Unable to save resume.") from exc
         return resume
+
+    def list_for_user(
+        self, user_id: int, offset: int, limit: int
+    ) -> tuple[list[Resume], int]:
+        ownership_filter = Resume.user_id == user_id
+        total = self.session.scalar(
+            select(func.count()).select_from(Resume).where(ownership_filter)
+        )
+        statement = (
+            select(Resume)
+            .where(ownership_filter)
+            .order_by(Resume.created_at.desc(), Resume.id.desc())
+            .offset(offset)
+            .limit(limit)
+        )
+        resumes = list(self.session.execute(statement).scalars().all())
+        return resumes, total or 0
+
+    def get_for_user(self, resume_id: int, user_id: int) -> Resume | None:
+        statement = select(Resume).where(
+            Resume.id == resume_id,
+            Resume.user_id == user_id,
+        )
+        return self.session.execute(statement).scalar_one_or_none()

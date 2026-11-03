@@ -4,6 +4,7 @@ import struct
 import zlib
 from dataclasses import dataclass
 from io import BytesIO
+from math import ceil
 
 from fastapi import UploadFile
 from pypdf import PdfReader, apply_configuration
@@ -56,10 +57,23 @@ class PdfProcessingLimitError(ResumeExtractionError):
     """Raised when a PDF exceeds a parser resource limit."""
 
 
+class ResumeNotFoundError(LookupError):
+    """Raised when the requested resume does not belong to the user."""
+
+
 @dataclass(frozen=True, slots=True)
 class ExtractedResumeText:
     text: str
     page_count: int
+
+
+@dataclass(frozen=True, slots=True)
+class ResumePage:
+    items: list[Resume]
+    total: int
+    page: int
+    page_size: int
+    total_pages: int
 
 
 class ResumeService:
@@ -75,6 +89,28 @@ class ResumeService:
             extracted_text=extracted.text,
             page_count=extracted.page_count,
         )
+
+    def list_resumes(
+        self, user_id: int, page: int, page_size: int
+    ) -> ResumePage:
+        resumes, total = self.repository.list_for_user(
+            user_id=user_id,
+            offset=(page - 1) * page_size,
+            limit=page_size,
+        )
+        return ResumePage(
+            items=resumes,
+            total=total,
+            page=page,
+            page_size=page_size,
+            total_pages=ceil(total / page_size) if total else 0,
+        )
+
+    def get_resume(self, user_id: int, resume_id: int) -> Resume:
+        resume = self.repository.get_for_user(resume_id, user_id)
+        if resume is None:
+            raise ResumeNotFoundError
+        return resume
 
 
 async def read_bounded_upload(upload: UploadFile) -> bytes:

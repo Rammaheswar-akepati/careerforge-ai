@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
 from sqlalchemy.orm import Session
 
 from app.api.v1.auth import get_current_user
@@ -8,7 +8,12 @@ from app.repositories.resume_repository import (
     ResumePersistenceError,
     ResumeRepository,
 )
-from app.schemas.resume import ResumeRead, ResumeTextRead
+from app.schemas.resume import (
+    ResumeListRead,
+    ResumeRead,
+    ResumeSummaryRead,
+    ResumeTextRead,
+)
 from app.services.resume_service import (
     EmptyPdfError,
     EncryptedPdfError,
@@ -16,6 +21,7 @@ from app.services.resume_service import (
     InvalidPdfError,
     NoExtractableTextError,
     PdfProcessingLimitError,
+    ResumeNotFoundError,
     ResumeTooLargeError,
     ResumeService,
     TooManyPdfPagesError,
@@ -144,3 +150,40 @@ async def upload_resume(
         await file.close()
 
     return resume
+
+
+@router.get("", response_model=ResumeListRead)
+def list_resumes(
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=20, ge=1, le=100),
+    current_user: User = Depends(get_current_user),
+    service: ResumeService = Depends(get_resume_service),
+) -> ResumeListRead:
+    """List metadata for the authenticated user's resumes."""
+    resume_page = service.list_resumes(current_user.id, page, page_size)
+    return ResumeListRead(
+        items=[
+            ResumeSummaryRead.model_validate(resume)
+            for resume in resume_page.items
+        ],
+        total=resume_page.total,
+        page=resume_page.page,
+        page_size=resume_page.page_size,
+        total_pages=resume_page.total_pages,
+    )
+
+
+@router.get("/{resume_id}", response_model=ResumeRead)
+def read_resume(
+    resume_id: int,
+    current_user: User = Depends(get_current_user),
+    service: ResumeService = Depends(get_resume_service),
+) -> ResumeRead:
+    """Return one resume only when it belongs to the authenticated user."""
+    try:
+        return service.get_resume(current_user.id, resume_id)
+    except ResumeNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Resume not found.",
+        ) from exc
