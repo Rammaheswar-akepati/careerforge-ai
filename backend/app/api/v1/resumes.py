@@ -1,4 +1,13 @@
-from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
+from fastapi import (
+    APIRouter,
+    Depends,
+    File,
+    HTTPException,
+    Query,
+    Response,
+    UploadFile,
+    status,
+)
 from sqlalchemy.orm import Session
 
 from app.api.v1.auth import get_current_user
@@ -187,3 +196,20 @@ def read_resume(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Resume not found.",
         ) from exc
+
+
+@router.delete("/{resume_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_resume(
+    resume_id: int,
+    current_user: User = Depends(get_current_user),
+    service: ResumeService = Depends(get_resume_service),
+) -> Response:
+    """Permanently delete one resume belonging to the authenticated user."""
+    try:
+        service.delete_resume(current_user.id, resume_id)
+    except ResumeNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Resume not found.",
+        ) from exc
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

@@ -112,6 +112,10 @@ class ResumeService:
             raise ResumeNotFoundError
         return resume
 
+    def delete_resume(self, user_id: int, resume_id: int) -> None:
+        if not self.repository.delete_for_user(resume_id, user_id):
+            raise ResumeNotFoundError
+
 
 async def read_bounded_upload(upload: UploadFile) -> bytes:
     """Read at most the configured limit plus one byte from the upload."""

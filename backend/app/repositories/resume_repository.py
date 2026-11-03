@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
@@ -62,3 +62,16 @@ class ResumeRepository:
             Resume.user_id == user_id,
         )
         return self.session.execute(statement).scalar_one_or_none()
+
+    def delete_for_user(self, resume_id: int, user_id: int) -> bool:
+        statement = delete(Resume).where(
+            Resume.id == resume_id,
+            Resume.user_id == user_id,
+        )
+        try:
+            result = self.session.execute(statement)
+            self.session.commit()
+        except SQLAlchemyError:
+            self.session.rollback()
+            raise
+        return result.rowcount == 1
